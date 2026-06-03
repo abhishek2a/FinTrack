@@ -1,0 +1,9 @@
+{
+  "name": "FinTrack",
+  "short_name": "FinTrack",
+  "start_url": "./exp tracker.html",
+  "display": "standalone",
+  "background_color": "#0d0d12",
+  "theme_color": "#0d0d12",
+  "icons": []
+}
