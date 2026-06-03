@@ -51,7 +51,7 @@
     --card-bg: #ffffff;
     --shadow: 0 4px 16px rgba(0,0,0,0.08);
   }
-  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; outline: none; }
   body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; overflow-x:hidden; transition: background 0.3s, color 0.3s; padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 
   /* Auth Forms */
@@ -101,7 +101,7 @@
   }
   #splash.hide { opacity:0; transform:scale(1.05); pointer-events:none; }
   .splash-logo {
-    font-family:'Syne',sans-serif; font-size:3.5rem; font-weight:800;
+    font-family:'DM Sans',sans-serif; font-size:3.5rem; font-weight:800; letter-spacing:-1.5px;
     background:linear-gradient(135deg, var(--accent), var(--accent2));
     -webkit-background-clip:text; -webkit-text-fill-color:transparent;
     letter-spacing:-2px; margin-bottom:8px;
@@ -121,7 +121,7 @@
     padding:calc(16px + env(safe-area-inset-top)) 24px 16px 24px; display:flex; align-items:center; justify-content:space-between;
     position:sticky; top:0; z-index:100; backdrop-filter:blur(16px);
   }
-  .logo { font-family:'Syne',sans-serif; font-size:1.4rem; font-weight:800; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .logo { font-family:'DM Sans',sans-serif; letter-spacing:-0.5px; font-size:1.4rem; font-weight:800; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
   .header-right { display:flex; gap:12px; align-items:center; }
   .btn-icon { background:var(--surface2); border:1px solid var(--border); color:var(--text); width:40px; height:40px; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; transition:all 0.2s; }
   .btn-icon:hover { background:var(--accent); border-color:var(--accent); }
@@ -497,6 +497,23 @@
 </div>
 
 <!-- ADD/EDIT MODAL -->
+<div class="modal-bg" id="whatsNewModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" style="font-family:'Syne',sans-serif; color:var(--accent);">What's New in v1.1.0 ✨</div>
+      <button class="btn-icon" onclick="closeModal('whatsNewModal')">✕</button>
+    </div>
+    <div style="padding:16px 0; line-height:1.6; color:var(--text); font-size:0.95rem;">
+      <ul style="margin-left:20px; display:flex; flex-direction:column; gap:8px;">
+        <li><strong>Offline Mode:</strong> FinTrack now fully supports robust offline PWA caching.</li>
+        <li><strong>Polished UI:</strong> Removed blue outlines, refined the logo font, and fixed mobile layout jumps.</li>
+        <li><strong>Budget Safety:</strong> Rock-solid bug fixes for budget saving logic.</li>
+      </ul>
+      <button class="btn-primary" style="margin-top:24px; width:100%" onclick="closeModal('whatsNewModal')">Awesome!</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="addModal">
   <div class="modal">
     <div class="modal-head">
@@ -916,6 +933,12 @@ window.addEventListener('offline', () => {
 });
 
 function init() {
+  const APP_VERSION = "1.1.0";
+  if (localStorage.getItem('ft_version') !== APP_VERSION) {
+    localStorage.setItem('ft_version', APP_VERSION);
+    setTimeout(() => openModal('whatsNewModal'), 600);
+  }
+
   applySettings();
   renderDashboard();
   renderExpenseList();
