@@ -1,6 +1,7 @@
 const CACHE_NAME = 'fintrack-v1';
 const urlsToCache = [
-  './exp tracker.html'
+  './index.html',
+  './'
 ];
 
 self.addEventListener('install', event => {
