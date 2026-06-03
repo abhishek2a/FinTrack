@@ -310,6 +310,7 @@
       <div class="profile-dropdown" id="profileDropdown">
         <div class="profile-btn" onclick="toggleDropdown()" title="Profile">
           <span id="userNameDisplay" class="header-user"></span>
+          <span id="syncStatusDisplay" style="font-size:0.6rem; color:var(--muted); margin-left:4px"></span>
           <span style="font-size:0.6rem; color:var(--muted); margin-left:2px">▼</span>
         </div>
         <div class="dropdown-menu" id="dropdownMenu">
@@ -413,7 +414,7 @@
         <div class="setting-info"><div class="setting-label">Edit Name</div><div class="setting-desc">Update your display name</div></div>
         <div style="display:flex;gap:8px;align-items:center">
           <input type="text" id="editNameInput" style="width:120px" placeholder="New Name">
-          <button class="btn-primary btn-sm" onclick="updateUserName()">Update</button>
+          <button class="btn-primary btn-sm" id="updateNameBtn" onclick="updateUserName()">Update</button>
         </div>
       </div>
       <div class="setting-row has-input">
@@ -421,7 +422,7 @@
         <div style="display:flex;gap:8px;align-items:center">
           <input type="password" id="oldPwdInput" style="width:120px" placeholder="Old Pwd">
           <input type="password" id="editPwdInput" style="width:120px" placeholder="New Pwd">
-          <button class="btn-primary btn-sm" onclick="updateUserPwd()">Update</button>
+          <button class="btn-primary btn-sm" id="updatePwdBtn" onclick="updateUserPwd()">Update</button>
         </div>
       </div>
       <div class="setting-row has-input">
@@ -566,8 +567,9 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, Timestamp, setDoc, getDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, Timestamp, setDoc, getDoc, onSnapshot, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBNybbo4XIBK4bPypIhtgXBoOLGDoqH9HM",
@@ -580,14 +582,50 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const appCheck = initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider('6Ld-YgotAAAAABLPt-zDW7onw4AnY5z5M1xLq9Ij'),
+  isTokenAutoRefreshEnabled: true
+});
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
 });
 const auth = getAuth(app);
 
 // GLOBALS
+window.fuzzyMatch = function(query, text) {
+  if (!query) return true;
+  query = query.toLowerCase();
+  text = text.toLowerCase();
+  if (query.length < 3 || text.includes(query)) return text.includes(query);
+  
+  const lev = (a,b) => {
+    const m = Array(b.length+1).fill(null).map(()=>Array(a.length+1).fill(null));
+    for(let i=0; i<=a.length; i++) m[0][i] = i;
+    for(let j=0; j<=b.length; j++) m[j][0] = j;
+    for(let j=1; j<=b.length; j++){
+      for(let i=1; i<=a.length; i++){
+        const ind = a[i-1] === b[j-1] ? 0 : 1;
+        m[j][i] = Math.min(m[j][i-1]+1, m[j-1][i]+1, m[j-1][i-1]+ind);
+      }
+    }
+    return m[b.length][a.length];
+  };
+
+  const qWords = query.split(/\s+/).filter(w=>w.length>0);
+  const tWords = text.split(/\s+/).filter(w=>w.length>0);
+  
+  for (let qw of qWords) {
+    let matched = false;
+    for (let tw of tWords) {
+      if (tw.includes(qw)) { matched = true; break; }
+      if (qw.length >= 3 && lev(qw, tw) <= 2) { matched = true; break; }
+    }
+    if (!matched) return false;
+  }
+  return true;
+};
 window.expenses = [];
-window.recurring = JSON.parse(localStorage.getItem('ft_recurring')||'[]');
+window.recurring = [];
 window.settings = JSON.parse(localStorage.getItem('ft_settings')||'{"budget":0,"warn":true,"autocat":true}');
 window.editId = null;
 window.currentMonth = new Date().getMonth();
@@ -637,13 +675,28 @@ async function loadData() {
     if(window.unsubscribeExpenses) window.unsubscribeExpenses();
     await new Promise((resolve) => {
       let isFirst = true;
-      window.unsubscribeExpenses = onSnapshot(q, (snap) => {
+      window.unsubscribeExpenses = onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
+        const statusEl = document.getElementById('syncStatusDisplay');
+        if(statusEl) {
+          if(!navigator.onLine) statusEl.textContent = '⚪ Offline';
+          else if(snap.metadata.hasPendingWrites) statusEl.textContent = '🟡 Syncing';
+          else statusEl.textContent = '🟢 Synced';
+        }
         window.expenses = snap.docs.map(d=>{
           const data = d.data();
           const parsedDate = data.date?.toDate ? data.date.toDate() : new Date(data.date);
           return {id:d.id, ...data, date:parsedDate, timestamp:parsedDate.getTime(), monthKey:`${parsedDate.getFullYear()}-${parsedDate.getMonth()}`};
         });
-        renderDashboard(); renderExpenseList(); renderCharts();
+        window.monthTotals = {};
+        window.expenses.forEach(e => {
+          window.monthTotals[e.monthKey] = (window.monthTotals[e.monthKey] || 0) + (+e.amount);
+        });
+        
+        requestAnimationFrame(() => {
+          renderDashboard(); 
+          renderExpenseList(); 
+          renderCharts();
+        });
         if(isFirst) { isFirst = false; resolve(); }
       }, (error) => {
         console.error("Realtime sync error:", error);
@@ -662,50 +715,56 @@ async function loadData() {
 }
 
 async function processRecurring() {
-  const todayMs = today().getTime();
-  let changed = false;
-  let batchCount = 0;
-  const batch = writeBatch(db);
+  if (!window.currentUser) return;
 
-  for (let r of window.recurring) {
-    if (!r.nextRun && r.lastRun) {
-      const d = new Date(r.lastRun);
-      if (r.freq === 'daily') d.setDate(d.getDate() + 1);
-      else if (r.freq === 'weekly') d.setDate(d.getDate() + 7);
-      else if (r.freq === 'monthly') d.setMonth(d.getMonth() + 1);
-      r.nextRun = d.getTime();
-      changed = true;
-    } else if (!r.nextRun && !r.lastRun) {
-      r.nextRun = todayMs;
-      changed = true;
-    }
+  try {
+    await runTransaction(db, async (transaction) => {
+      const recRef = doc(db, 'users', window.currentUser.uid, 'config', 'recurring');
+      const recDoc = await transaction.get(recRef);
+      let recurringList = recDoc.exists() ? (recDoc.data().list || []) : window.recurring;
 
-    let runs = 0;
-    while (r.nextRun <= todayMs && runs < 50) {
-      const d = new Date(r.nextRun);
-      const data = { amount: r.amount, category: r.category, note: `${r.name} (Auto)`, date: Timestamp.fromDate(d), recurring: r.freq };
-      
-      const newDocRef = doc(collection(db,`users/${window.currentUser.uid}/expenses`));
-      batch.set(newDocRef, data);
-      
-      if (r.freq === 'daily') d.setDate(d.getDate() + 1);
-      else if (r.freq === 'weekly') d.setDate(d.getDate() + 7);
-      else if (r.freq === 'monthly') d.setMonth(d.getMonth() + 1);
-      r.nextRun = d.getTime();
-      
-      runs++;
-      changed = true;
-      batchCount++;
-    }
-    if (runs > 0) window.showToast(`Auto-added: ${r.name} (${runs}x)`);
-  }
-  
-  if (batchCount > 0) {
-    await batch.commit(); 
-  }
+      const todayMs = today().getTime();
+      let changed = false;
 
-  if(changed && window.currentUser) {
-    await setDoc(doc(db,'users',window.currentUser.uid,'config','recurring'), {list: window.recurring});
+      for (let r of recurringList) {
+        if (!r.nextRun && r.lastRun) {
+          const d = new Date(r.lastRun);
+          if (r.freq === 'daily') d.setDate(d.getDate() + 1);
+          else if (r.freq === 'weekly') d.setDate(d.getDate() + 7);
+          else if (r.freq === 'monthly') d.setMonth(d.getMonth() + 1);
+          r.nextRun = d.getTime();
+          changed = true;
+        } else if (!r.nextRun && !r.lastRun) {
+          r.nextRun = todayMs;
+          changed = true;
+        }
+
+        let runs = 0;
+        while (r.nextRun <= todayMs && runs < 50) {
+          const d = new Date(r.nextRun);
+          const data = { amount: r.amount, category: r.category, note: `${r.name} (Auto)`, date: Timestamp.fromDate(d), recurring: r.freq };
+          
+          const newDocRef = doc(collection(db,`users/${window.currentUser.uid}/expenses`));
+          transaction.set(newDocRef, data);
+          
+          if (r.freq === 'daily') d.setDate(d.getDate() + 1);
+          else if (r.freq === 'weekly') d.setDate(d.getDate() + 7);
+          else if (r.freq === 'monthly') d.setMonth(d.getMonth() + 1);
+          r.nextRun = d.getTime();
+          
+          runs++;
+          changed = true;
+        }
+        if (runs > 0) setTimeout(() => window.showToast(`Auto-added: ${r.name} (${runs}x)`), 100);
+      }
+
+      if (changed) {
+        transaction.set(recRef, {list: recurringList});
+        window.recurring = recurringList;
+      }
+    });
+  } catch (e) {
+    console.error("Recurring Transaction Failed:", e);
   }
 }
 
@@ -762,6 +821,7 @@ window.forgotPassword = async function() {
 window.toggleTheme = function() {
   const isLight = document.documentElement.classList.toggle('light');
   localStorage.setItem('ft_theme', isLight ? 'light' : 'dark');
+  if(window.renderCharts) renderCharts();
 }
 // Load saved theme
 if(localStorage.getItem('ft_theme') === 'light') {
@@ -782,12 +842,15 @@ window.addEventListener('click', function(e) {
 window.updateUserName = async function() {
   const newName = document.getElementById('editNameInput').value.trim();
   if(!newName) return window.showToast("Enter a new name");
+  const btn = document.getElementById('updateNameBtn');
+  btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
   try {
     await updateProfile(auth.currentUser, { displayName: newName });
     document.getElementById('userNameDisplay').textContent = "Hi, " + newName;
     window.showToast("Name updated!");
     document.getElementById('editNameInput').value = '';
   } catch(e) { window.showToast("Error updating name"); }
+  btn.innerHTML = 'Update'; btn.disabled = false;
 }
 
 window.updateUserPwd = async function() {
@@ -795,6 +858,8 @@ window.updateUserPwd = async function() {
   const newPwd = document.getElementById('editPwdInput').value;
   if(!oldPwd) return window.showToast("Enter your old password");
   if(newPwd.length < 6) return window.showToast("New password must be 6+ chars");
+  const btn = document.getElementById('updatePwdBtn');
+  btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
   try {
     const cred = EmailAuthProvider.credential(auth.currentUser.email, oldPwd);
     await reauthenticateWithCredential(auth.currentUser, cred);
@@ -805,6 +870,7 @@ window.updateUserPwd = async function() {
   } catch(e) { 
     window.showToast(e.message.replace("Firebase: ", "")); 
   }
+  btn.innerHTML = 'Update'; btn.disabled = false;
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -813,8 +879,16 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-window.addEventListener('online', () => window.showToast('Back online. Syncing...'));
-window.addEventListener('offline', () => window.showToast('Offline. Saving locally.'));
+window.addEventListener('online', () => {
+  window.showToast('Back online. Syncing...');
+  const statusEl = document.getElementById('syncStatusDisplay');
+  if(statusEl) statusEl.textContent = '🟡 Syncing';
+});
+window.addEventListener('offline', () => {
+  window.showToast('Offline. Saving locally.');
+  const statusEl = document.getElementById('syncStatusDisplay');
+  if(statusEl) statusEl.textContent = '⚪ Offline';
+});
 
 function init() {
   applySettings();
@@ -912,7 +986,12 @@ function renderExpenseList() {
   const search = (document.getElementById('searchInput').value||'').toLowerCase();
   let exps = getMonthExp(y,m);
   if(window.activeFilter!=='All') exps=exps.filter(e=>e.category===window.activeFilter);
-  if(search) exps=exps.filter(e=>(e.note||'').toLowerCase().includes(search)||(e.category||'').toLowerCase().includes(search));
+  if(search) {
+    exps = exps.filter(e => {
+      const fullText = `${e.note||''} ${e.category||''}`;
+      return window.fuzzyMatch(search, fullText);
+    });
+  }
   exps.sort((a,b)=>b.timestamp-a.timestamp);
 
   // filter chips
@@ -1009,7 +1088,7 @@ function renderCharts(){
   for(let i=5;i>=0;i--){
     const d=new Date(y,m-i,1);
     const ym=d.getFullYear(), mm=d.getMonth();
-    const sum=getMonthExp(ym,mm).reduce((s,e)=>s+(+e.amount),0);
+    const sum = window.monthTotals ? (window.monthTotals[`${ym}-${mm}`] || 0) : 0;
     trendLabels.push(d.toLocaleDateString('en-IN',{month:'short','year':'2-digit'}));
     trend.push(sum);
   }
@@ -1036,8 +1115,15 @@ window.generateInsights = async function(){
   await new Promise(r => setTimeout(r, 600));
 
   try {
-    const monthExp = getMonthExp(window.currentYear,window.currentMonth);
-    const prevExp = getMonthExp(window.currentYear,window.currentMonth-1);
+    let prevMonth = window.currentMonth - 1;
+    let prevYear = window.currentYear;
+    if (prevMonth < 0) { 
+      prevMonth = 11; 
+      prevYear--; 
+    }
+
+    const monthExp = getMonthExp(window.currentYear, window.currentMonth);
+    const prevExp = getMonthExp(prevYear, prevMonth);
     const monthSum = monthExp.reduce((s,e)=>s+(+e.amount),0);
     const prevSum = prevExp.reduce((s,e)=>s+(+e.amount),0);
     const catSums = {};
@@ -1109,7 +1195,7 @@ function renderRecurring(){
       <div class="cat-dot" style="background:${CATS[r.category]||'#a0a0b8'}22;color:${CATS[r.category]||'#a0a0b8'}">${EMOJIS[r.category]||'🏷️'}</div>
       <div style="flex:1"><div style="font-size:0.9rem;font-weight:500">${escapeHTML(r.name)}</div><div style="font-size:0.75rem;color:var(--muted)">${escapeHTML(r.category)} • ${escapeHTML(r.freq)} • Next: ${new Date(r.nextRun).toLocaleDateString('en-IN', {month:'short', day:'numeric'})}</div></div>
       <div style="font-family:Syne,sans-serif;font-weight:700;color:var(--accent2);margin-right:12px">${fmt(r.amount)}</div>
-      <button class="btn-xs" style="background:transparent;color:var(--accent);border:1px solid var(--accent);margin-right:4px;" onclick="editRecurring(${i})">✏️</button>
+      <button class="btn-xs" onclick="editRecurring(${i})">✏️</button>
       <button class="btn-xs del" onclick="deleteRecurring(${i})">🗑️</button>
     </div>
   `).join('');
@@ -1121,7 +1207,10 @@ window.saveRecurring=async function(){
   const cat=document.getElementById('rCategory').value;
   const freq=document.getElementById('rFreq').value;
   const dateStr=document.getElementById('rDate').value;
-  if(!name || amount<=0 || !dateStr){ window.showToast('Fill all fields with valid amounts'); return; }
+  if(!name || amount<=0 || amount>1000000 || !Number.isFinite(amount) || !dateStr){ window.showToast('Fill all fields with valid amounts'); return; }
+  const btn=document.getElementById('saveRecBtn');
+  btn.innerHTML='<span class="spinner"></span>';
+  btn.disabled=true;
   const [y,m,d] = dateStr.split('-');
   const startDate = new Date(y, m-1, d).getTime();
   
@@ -1129,13 +1218,19 @@ window.saveRecurring=async function(){
   if(window.editRecId != null) window.recurring[window.editRecId] = recData;
   else window.recurring.push(recData);
   
-  if(window.currentUser) {
-    try { await setDoc(doc(db,'users',window.currentUser.uid,'config','recurring'), {list: window.recurring}); } catch(e){}
-  }
-  localStorage.setItem('ft_recurring',JSON.stringify(window.recurring));
   closeModal('recurringModal');
   renderRecurring();
-  showToast(window.editRecId != null ? 'Recurring expense updated!' : 'Recurring expense saved!');
+  
+  if(window.currentUser) {
+    setDoc(doc(db,'users',window.currentUser.uid,'config','recurring'), {list: window.recurring})
+      .then(() => window.showToast(window.editRecId != null ? 'Recurring expense updated!' : 'Recurring expense saved!'))
+      .catch(() => window.showToast('Saved offline. Will sync automatically.'));
+  } else {
+    window.showToast('Saved locally.');
+  }
+  
+  btn.innerHTML='Save Recurring';
+  btn.disabled=false;
 }
 
 window.editRecurring=function(i){
@@ -1151,13 +1246,12 @@ window.editRecurring=function(i){
   openModal('recurringModal');
 }
 
-window.deleteRecurring=async function(i){
+window.deleteRecurring=function(i){
   if(!confirm('Delete this recurring expense?')) return;
   window.recurring.splice(i,1);
   if(window.currentUser) {
-    try { await setDoc(doc(db,'users',window.currentUser.uid,'config','recurring'), {list: window.recurring}); } catch(e){}
+    setDoc(doc(db,'users',window.currentUser.uid,'config','recurring'), {list: window.recurring}).catch(()=>{});
   }
-  localStorage.setItem('ft_recurring',JSON.stringify(window.recurring));
   renderRecurring();
   showToast('Deleted');
 }
@@ -1169,7 +1263,7 @@ window.saveExpense=async function(){
   const note=document.getElementById('fNote').value.trim();
   const date=document.getElementById('fDate').value;
   const recurring=document.getElementById('fRecurring').value;
-  if(amount <= 0 || !Number.isFinite(amount) || !date){ window.showToast('Fill valid amount and date'); return; }
+  if(amount <= 0 || amount > 1000000 || !Number.isFinite(amount) || !date){ window.showToast('Fill valid amount and date'); return; }
   const btn=document.getElementById('saveBtn');
   btn.innerHTML='<span class="spinner"></span>';
   btn.disabled=true;
@@ -1181,20 +1275,21 @@ window.saveExpense=async function(){
   
   closeModal('addModal');
   window.editId=null;
+  btn.innerHTML='Save Expense';
+  btn.disabled=false;
 
   try {
     const fbData={amount,category,note,date:Timestamp.fromDate(localDate),recurring};
     if(!isNew){
-      await updateDoc(doc(db,`users/${window.currentUser.uid}/expenses`,editId),fbData);
-      window.showToast('Updated successfully!');
+      updateDoc(doc(db,`users/${window.currentUser.uid}/expenses`,editId),fbData)
+        .then(() => window.showToast('Updated successfully!'))
+        .catch(() => window.showToast('Saved offline. Will sync automatically.'));
     } else {
-      await addDoc(collection(db,`users/${window.currentUser.uid}/expenses`),fbData);
-      window.showToast('Added successfully!');
+      addDoc(collection(db,`users/${window.currentUser.uid}/expenses`),fbData)
+        .then(() => window.showToast('Added successfully!'))
+        .catch(() => window.showToast('Saved offline. Will sync automatically.'));
     }
-  } catch(e) { console.error(e); window.showToast('Saved offline. Will sync automatically.'); }
-  
-  btn.innerHTML='Save Expense';
-  btn.disabled=false;
+  } catch(e) { console.error(e); }
 }
 
 window.editExpense=function(id){
@@ -1244,25 +1339,45 @@ window.aiSuggestCategory=function(){
 
 // SETTINGS
 window.saveBudget=async function(){
+  const btn = document.querySelector('button[onclick="saveBudget()"]');
+  if(btn) { btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true; }
+  
   const val=+document.getElementById('budgetInput').value;
   window.settings.budget=val;
   window.settings.warn=document.getElementById('warnToggle').checked;
   window.settings.autocat=document.getElementById('autocat').checked;
   if(window.currentUser) {
-    try { 
-      await setDoc(doc(db,'users',window.currentUser.uid,'config','settings'), window.settings); 
-      window.showToast('Settings saved!');
-    } catch(e) { window.showToast('Settings saved locally.'); }
+    setDoc(doc(db,'users',window.currentUser.uid,'config','settings'), window.settings)
+      .then(() => window.showToast('Settings saved!'))
+      .catch(() => window.showToast('Settings saved locally.'));
   }
   localStorage.setItem('ft_settings',JSON.stringify(window.settings));
   renderDashboard();
+  
+  if(btn) { btn.innerHTML='Save'; btn.disabled=false; }
 }
 
 window.clearAllData=async function(){
   if(!confirm('Delete ALL expenses permanently? This cannot be undone!')) return;
   try {
-    const snap=await getDocs(collection(db,`users/${window.currentUser.uid}/expenses`));
-    await Promise.all(snap.docs.map(d=>deleteDoc(d.ref)));
+    const snap = await getDocs(collection(db,`users/${window.currentUser.uid}/expenses`));
+    let batches = [];
+    let currentBatch = writeBatch(db);
+    let count = 0;
+
+    snap.docs.forEach(d => {
+      currentBatch.delete(d.ref);
+      count++;
+      if (count === 490) { 
+        batches.push(currentBatch.commit());
+        currentBatch = writeBatch(db);
+        count = 0;
+      }
+    });
+    
+    if (count > 0) batches.push(currentBatch.commit());
+    await Promise.all(batches); 
+    
     window.expenses=[];
     renderDashboard(); renderExpenseList(); renderCharts();
     window.showToast('All data cleared');
