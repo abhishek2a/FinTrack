@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>FinTrack — Smart Expense Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -44,8 +44,8 @@
     --card-bg: #ffffff;
     --shadow: 0 4px 16px rgba(0,0,0,0.08);
   }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; overflow-x:hidden; transition: background 0.3s, color 0.3s; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; overflow-x:hidden; transition: background 0.3s, color 0.3s; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 
   /* Auth Forms */
   .auth-link { color:var(--accent); cursor:pointer; text-decoration:underline; font-size:0.85rem; }
@@ -54,15 +54,21 @@
     header { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
     .header-right { margin-left: auto; }
     .header-user { font-size: 0.8rem; }
-    nav button { padding: 10px 4px; font-size: 0.7rem; min-width: 60px; }
+    
+    /* Bottom Navigation Tab Bar */
+    nav { position: fixed; bottom: 0; left: 0; right: 0; padding-bottom: env(safe-area-inset-bottom); z-index: 1000; background: var(--surface); border-top: 1px solid var(--border); border-bottom: none; overflow-x: visible; }
+    nav button { padding: 12px 4px; font-size: 0.7rem; min-width: 0; flex: 1; border-bottom: none !important; border-top: 2px solid transparent; }
+    nav button.active { border-top-color: var(--accent); }
+    main { padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important; }
+
     .cards-grid { grid-template-columns: 1fr; }
     .form-grid, .form-row { grid-template-columns: 1fr !important; }
-    #toast { width: 90%; left: 50%; text-align: center; white-space: normal; }
+    #toast { width: 90%; left: 50%; text-align: center; white-space: normal; bottom: calc(80px + env(safe-area-inset-bottom)); }
   }
 
   /* SPLASH */
   #splash {
-    position:fixed; inset:0; z-index:9999;
+    position:fixed; inset:0; z-index:10001;
     background:var(--bg);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     transition:opacity 0.6s ease, transform 0.6s ease;
@@ -169,8 +175,8 @@
   label { display:block; font-size:0.78rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:6px; }
   input, select, textarea {
     width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text);
-    border-radius:10px; padding:10px 14px; font-family:'DM Sans',sans-serif; font-size:0.9rem;
-    transition:border-color 0.2s; outline:none;
+    border-radius:10px; padding:10px 14px; font-family:'DM Sans',sans-serif; font-size:16px;
+    transition:border-color 0.2s; outline:none; appearance:none; -webkit-appearance:none;
   }
   input:focus, select:focus, textarea:focus { border-color:var(--accent); }
   textarea { resize:vertical; min-height:70px; }
@@ -224,7 +230,8 @@
   #toast.show { opacity:1; }
 
   /* FILTER BAR */
-  .filter-bar { display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; padding-bottom:4px; }
+  .filter-bar { display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .filter-bar::-webkit-scrollbar { display:none; }
   .filter-chip { background:var(--surface2); border:1px solid var(--border); color:var(--muted); border-radius:99px; padding:6px 14px; font-size:0.78rem; cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0; }
   .filter-chip.active { background:var(--accent); border-color:var(--accent); color:#fff; }
 
@@ -418,33 +425,39 @@
 </div>
 
 <!-- AUTH MODAL -->
-<div class="modal-bg open" id="authModal" style="z-index:10000; backdrop-filter:blur(8px);">
-  <div class="modal">
-    <div class="modal-head">
-      <div class="modal-title" id="authTitle">Sign In</div>
+<div class="modal-bg open" id="authModal" style="z-index:10000; background:var(--bg); backdrop-filter:none; padding:0;">
+  <div class="modal" style="box-shadow:none; border:none; background:transparent; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; max-width:400px; margin:0 auto; animation:none; transform:none;">
+    <div style="text-align:center; margin-bottom:40px;">
+      <div class="splash-logo" style="font-size:3rem; margin-bottom:8px;">FinTrack</div>
+      <div class="splash-sub" style="margin-bottom:0; letter-spacing:2px; font-size: 0.9rem;">Smart Expense Tracker</div>
     </div>
-    <div class="form-grid" id="authFormGrid">
-      <div id="nameField" style="display:none;">
-        <label>Full Name</label>
-        <input type="text" id="authName" placeholder="Your Name">
+    <div style="width:100%; background:var(--surface); padding:32px 24px; border-radius:24px; border:1px solid var(--border); box-shadow:var(--shadow);">
+      <div class="modal-head" style="justify-content:center; border-bottom:none; margin-bottom:16px;">
+        <div class="modal-title" id="authTitle" style="font-size:1.5rem;">Sign In</div>
       </div>
-      <div>
-        <label>Email</label>
-        <input type="email" id="authEmail" placeholder="name@example.com">
-      </div>
-      <div>
-        <label>Password</label>
-        <input type="password" id="authPassword" placeholder="••••••••">
-      </div>
-      <div style="grid-column:1/-1">
-        <button class="btn-primary" style="width:100%;justify-content:center" id="authBtn">Sign In</button>
-      </div>
-      <div style="grid-column:1/-1; text-align:center; margin-top:8px;">
-        <span id="authToggleText" style="font-size:0.85rem;color:var(--muted)">Don't have an account?</span> 
-        <span class="auth-link" onclick="toggleAuthMode()" id="authToggleLink">Sign Up</span>
-      </div>
-      <div style="grid-column:1/-1; text-align:center;">
-        <span class="auth-link" onclick="forgotPassword()" id="forgotPwdLink">Forgot Password?</span>
+      <div class="form-grid" id="authFormGrid">
+        <div id="nameField" style="display:none;">
+          <label>Full Name</label>
+          <input type="text" id="authName" placeholder="Your Name">
+        </div>
+        <div>
+          <label>Email</label>
+          <input type="email" id="authEmail" placeholder="name@example.com">
+        </div>
+        <div>
+          <label>Password</label>
+          <input type="password" id="authPassword" placeholder="••••••••">
+        </div>
+        <div style="grid-column:1/-1; margin-top:8px;">
+          <button class="btn-primary" style="width:100%;justify-content:center; padding:14px; font-size:1rem;" id="authBtn">Sign In</button>
+        </div>
+        <div style="grid-column:1/-1; text-align:center; margin-top:16px;">
+          <span id="authToggleText" style="font-size:0.85rem;color:var(--muted)">Don't have an account?</span> 
+          <span class="auth-link" onclick="toggleAuthMode()" id="authToggleLink">Sign Up</span>
+        </div>
+        <div style="grid-column:1/-1; text-align:center; margin-top:8px;">
+          <span class="auth-link" onclick="forgotPassword()" id="forgotPwdLink">Forgot Password?</span>
+        </div>
       </div>
     </div>
   </div>
@@ -1165,7 +1178,7 @@ window.closeModal=function(id){
   document.getElementById(id).classList.remove('open');
   if(id==='addModal') window.editId=null;
 }
-document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) closeModal(m.id); }));
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m && m.id!=='authModal') closeModal(m.id); }));
 
 // NAV
 window.showPage=function(name,btn){
