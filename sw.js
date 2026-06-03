@@ -1,11 +1,10 @@
-const CACHE_NAME = 'fintrack-v1.1.0';
+const CACHE_NAME = 'fintrack-v1.1.1';
 const urlsToCache = [
   './index.html',
   './'
 ];
 
 self.addEventListener('install', event => {
-  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(urlsToCache))
@@ -40,4 +39,10 @@ self.addEventListener('fetch', event => {
       })
       .catch(() => caches.match(event.request))
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });
