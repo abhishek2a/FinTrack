@@ -629,7 +629,7 @@ window.fuzzyMatch = function(query, text) {
 };
 window.expenses = [];
 window.recurring = [];
-window.settings = JSON.parse(localStorage.getItem('ft_settings')||'{"budget":0,"warn":true,"autocat":true}');
+window.settings = { budget: 0, warn: true, autocat: true };
 window.editId = null;
 window.currentMonth = new Date().getMonth();
 window.currentYear = new Date().getFullYear();
@@ -748,7 +748,7 @@ async function processRecurring() {
         }
 
         let runs = 0;
-        while (r.nextRun <= todayMs && runs < 50) {
+        while (r.nextRun <= todayMs && runs < 365) {
           const d = new Date(r.nextRun);
           const data = { amount: r.amount, category: r.category, note: `${r.name} (Auto)`, date: Timestamp.fromDate(d), recurring: r.freq };
           
@@ -908,10 +908,6 @@ window.addEventListener('offline', () => {
   if(statusEl) statusEl.textContent = '⚪ Offline';
 });
 
-window.getLocalIsoDate = function(d = new Date()) {
-  return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-}
-
 function init() {
   applySettings();
   renderDashboard();
@@ -930,6 +926,9 @@ function applySettings() {
 }
 
 // HELPERS
+window.getLocalIsoDate = function(d = new Date()) {
+  return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+}
 function fmt(n){ return '₹'+(+n||0).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function today(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
 function startOfWeek(){ const d=today(); d.setDate(d.getDate()-d.getDay()); return d; }
@@ -1268,8 +1267,12 @@ window.saveRecurring=async function(){
       window.showToast(window.editRecId != null ? 'Recurring expense updated!' : 'Recurring expense saved!');
       closeModal('recurringModal');
       window.editRecId = null;
+      btn.innerHTML='Save Recurring';
+      btn.disabled=false;
     } catch(e) {
       window.showToast('Error saving recurring expense');
+      btn.innerHTML='Save Recurring';
+      btn.disabled=false;
     }
   } else {
     if(window.editRecId != null) window.recurring[window.editRecId] = recData;
@@ -1277,8 +1280,9 @@ window.saveRecurring=async function(){
     closeModal('recurringModal');
     renderRecurring();
     window.showToast('Saved locally.');
-  btn.innerHTML='Save Recurring';
-  btn.disabled=false;
+    btn.innerHTML='Save Recurring';
+    btn.disabled=false;
+  }
 }
 
 window.editRecurring=function(i){
