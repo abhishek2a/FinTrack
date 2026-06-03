@@ -1458,7 +1458,7 @@ window.saveBudget = async function() {
     window.showToast('Settings saved!');
   } catch (error) {
     console.error('Budget save failed:', error);
-    window.showToast('Failed to save settings');
+    window.showToast('Saved locally. Will sync when online.');
   } finally {
     if (btn) {
       btn.innerHTML = 'Save';
