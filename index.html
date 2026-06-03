@@ -54,7 +54,8 @@
   .auth-link { color:var(--accent); cursor:pointer; text-decoration:underline; font-size:0.85rem; }
   
   @media(max-width:600px) {
-    header { padding: calc(12px + env(safe-area-inset-top)) 16px 12px 16px; flex-wrap: nowrap; gap: 8px; }
+    header { padding: calc(12px + env(safe-area-inset-top)) 16px 12px 16px; flex-wrap: nowrap; gap: 8px; border-bottom: none; }
+    #btnAddExp { display: none !important; }
     .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
     .header-user { font-size: 0.8rem; }
     
@@ -1069,6 +1070,7 @@ function renderRecurring(){
       <div class="cat-dot" style="background:${CATS[r.category]||'#a0a0b8'}22;color:${CATS[r.category]||'#a0a0b8'}">${EMOJIS[r.category]||'🏷️'}</div>
       <div style="flex:1"><div style="font-size:0.9rem;font-weight:500">${escapeHTML(r.name)}</div><div style="font-size:0.75rem;color:var(--muted)">${escapeHTML(r.category)} • ${escapeHTML(r.freq)} • Next: ${new Date(r.nextRun).toLocaleDateString('en-IN', {month:'short', day:'numeric'})}</div></div>
       <div style="font-family:Syne,sans-serif;font-weight:700;color:var(--accent2);margin-right:12px">${fmt(r.amount)}</div>
+      <button class="btn-xs" style="background:transparent;color:var(--accent);border:1px solid var(--accent);margin-right:4px;" onclick="editRecurring(${i})">✏️</button>
       <button class="btn-xs del" onclick="deleteRecurring(${i})">🗑️</button>
     </div>
   `).join('');
@@ -1083,14 +1085,31 @@ window.saveRecurring=async function(){
   if(!name||!amount||!dateStr){ showToast('Fill all fields'); return; }
   const [y,m,d] = dateStr.split('-');
   const startDate = new Date(y, m-1, d).getTime();
-  window.recurring.push({name,amount:+amount,category:cat,freq,nextRun:startDate});
+  
+  const recData = {name,amount:+amount,category:cat,freq,nextRun:startDate};
+  if(window.editRecId != null) window.recurring[window.editRecId] = recData;
+  else window.recurring.push(recData);
+  
   if(window.currentUser) {
     try { await setDoc(doc(db,'users',window.currentUser.uid,'config','recurring'), {list: window.recurring}); } catch(e){}
   }
   localStorage.setItem('ft_recurring',JSON.stringify(window.recurring));
   closeModal('recurringModal');
   renderRecurring();
-  showToast('Recurring expense saved!');
+  showToast(window.editRecId != null ? 'Recurring expense updated!' : 'Recurring expense saved!');
+}
+
+window.editRecurring=function(i){
+  const r=window.recurring[i];
+  if(!r) return;
+  window.editRecId=i;
+  document.getElementById('rName').value=r.name;
+  document.getElementById('rAmount').value=r.amount;
+  document.getElementById('rCategory').value=r.category;
+  document.getElementById('rFreq').value=r.freq;
+  document.getElementById('rDate').value=new Date(r.nextRun).toISOString().split('T')[0];
+  document.getElementById('recurringModal').querySelector('.modal-title').textContent='Edit Recurring Expense';
+  openModal('recurringModal');
 }
 
 window.deleteRecurring=async function(i){
@@ -1248,18 +1267,20 @@ window.openModal=function(id){
     document.getElementById('fDate').value=new Date().toISOString().split('T')[0];
     document.getElementById('fRecurring').value='none';
     document.getElementById('aiTag').style.display='none';
-  } else if (id==='recurringModal') {
+  } else if (id==='recurringModal' && window.editRecId == null) {
     document.getElementById('rName').value='';
     document.getElementById('rAmount').value='';
     document.getElementById('rCategory').value='Food';
     document.getElementById('rFreq').value='monthly';
     document.getElementById('rDate').value=new Date().toISOString().split('T')[0];
+    document.getElementById('recurringModal').querySelector('.modal-title').textContent='Add Recurring Expense';
   }
   document.getElementById(id).classList.add('open');
 }
 window.closeModal=function(id){
   document.getElementById(id).classList.remove('open');
   if(id==='addModal') window.editId=null;
+  if(id==='recurringModal') window.editRecId=null;
 }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m && m.id!=='authModal') closeModal(m.id); }));
 
