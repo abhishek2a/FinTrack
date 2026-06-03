@@ -173,8 +173,8 @@
   .expense-item:hover { border-color:var(--accent); }
   .cat-dot { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
   .expense-info { flex:1; min-width:0; }
-  .expense-note { font-size:0.9rem; font-weight:500; word-break: break-word; }
-  .expense-meta { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+  .expense-note { font-size:0.9rem; font-weight:500; word-break: break-word; line-height: 1.3; }
+  .expense-meta { font-size:0.75rem; color:var(--muted); margin-top:4px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; line-height:1.2; }
   .expense-amount { font-family:'Syne',sans-serif; font-size:1rem; font-weight:700; color:var(--accent2); flex-shrink:0; }
   .expense-actions { display:flex; gap:6px; flex-shrink:0; }
   .btn-xs { background:var(--surface2); border:1px solid var(--border); color:var(--muted); border-radius:8px; padding:5px 8px; font-size:0.72rem; cursor:pointer; transition:all 0.2s; }
@@ -270,7 +270,7 @@
   .spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.6s linear infinite; }
   @keyframes spin { to{transform:rotate(360deg)} }
 
-  .recurring-badge { background:var(--surface2); border:1px solid var(--border); color:var(--muted); font-size:0.68rem; border-radius:99px; padding:2px 8px; }
+  .recurring-badge { background:var(--surface2); border:1px solid var(--border); color:var(--muted); font-size:0.65rem; border-radius:99px; padding:2px 8px; display:inline-flex; align-items:center; white-space:nowrap; }
 
   /* DROPDOWN */
   .profile-dropdown { position:relative; display:none; align-items:center; margin-left:4px; }
@@ -310,10 +310,10 @@
       <div class="profile-dropdown" id="profileDropdown">
         <div class="profile-btn" onclick="toggleDropdown()" title="Profile">
           <span id="userNameDisplay" class="header-user"></span>
-          <span id="syncStatusDisplay" style="font-size:0.6rem; color:var(--muted); margin-left:4px"></span>
           <span style="font-size:0.6rem; color:var(--muted); margin-left:2px">▼</span>
         </div>
         <div class="dropdown-menu" id="dropdownMenu">
+          <div id="syncStatusDisplay" style="padding:8px 16px; font-size:0.75rem; color:var(--muted); border-bottom:1px solid var(--border); text-align:center; pointer-events:none;">🟢 Synced</div>
           <button onclick="signOutUser()">Sign Out</button>
         </div>
       </div>
@@ -805,7 +805,15 @@ window.handleAuth = async function() {
 }
 
 window.signOutUser = async function() {
-  try { window.unsubscribeExpenses?.(); await signOut(auth); window.expenses = []; }
+  try { 
+    window.unsubscribeExpenses?.(); 
+    if(charts.pie) { charts.pie.destroy(); charts.pie = null; }
+    if(charts.bar) { charts.bar.destroy(); charts.bar = null; }
+    if(charts.line) { charts.line.destroy(); charts.line = null; }
+    if(charts.trend) { charts.trend.destroy(); charts.trend = null; }
+    await signOut(auth); 
+    window.expenses = []; 
+  }
   catch(e) { window.showToast("Error signing out"); }
 }
 
@@ -969,7 +977,12 @@ function expenseHTML(e) {
     <div class="cat-dot" style="background:${color}22;color:${color}">${emoji}</div>
     <div class="expense-info">
       <div class="expense-note">${escapeHTML(e.note||e.category)}</div>
-      <div class="expense-meta">${escapeHTML(e.category)} · ${dateStr}${e.recurring&&e.recurring!=='none'?' · <span class="recurring-badge">'+escapeHTML(e.recurring)+'</span>':''}</div>
+      <div class="expense-meta">
+        <span>${escapeHTML(e.category)}</span>
+        <span style="opacity:0.5">•</span>
+        <span>${dateStr}</span>
+        ${e.recurring&&e.recurring!=='none'?'<span class="recurring-badge">'+escapeHTML(e.recurring)+'</span>':''}
+      </div>
     </div>
     <div class="expense-amount">${fmt(e.amount)}</div>
     <div class="expense-actions">
@@ -1026,6 +1039,10 @@ function renderCharts(){
   document.getElementById('monthLabelChart').textContent=new Date(y,m).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
   const exps=getMonthExp(y,m);
 
+  const rootStyle = getComputedStyle(document.documentElement);
+  const textColor = rootStyle.getPropertyValue('--muted').trim() || '#6b6b85';
+  const gridColor = rootStyle.getPropertyValue('--border').trim() || '#2a2a3a';
+
   // PIE
   const catSums={};
   exps.forEach(e=>{ catSums[e.category]=(catSums[e.category]||0)+(+e.amount); });
@@ -1036,12 +1053,13 @@ function renderCharts(){
     charts.pie.data.labels = pieLabels;
     charts.pie.data.datasets[0].data = pieData;
     charts.pie.data.datasets[0].backgroundColor = pieColors;
+    charts.pie.options.plugins.legend.labels.color = textColor;
     charts.pie.update();
   } else {
     charts.pie=new Chart(document.getElementById('pieChart'),{
       type:'doughnut',
       data:{labels:pieLabels,datasets:[{data:pieData,backgroundColor:pieColors,borderWidth:0}]},
-      options:{plugins:{legend:{labels:{color:'#6b6b85',font:{family:'DM Sans'}}}},cutout:'65%',maintainAspectRatio:true}
+      options:{plugins:{legend:{labels:{color:textColor,font:{family:'DM Sans'}}}},cutout:'65%',maintainAspectRatio:true}
     });
   }
 
@@ -1056,12 +1074,15 @@ function renderCharts(){
     charts.bar.data.datasets[0].data = barData;
     charts.bar.data.datasets[0].backgroundColor = barBg;
     charts.bar.data.datasets[0].borderColor = barBorder;
+    charts.bar.options.scales.x.ticks.color = textColor;
+    charts.bar.options.scales.y.ticks.color = textColor;
+    charts.bar.options.scales.y.grid.color = gridColor;
     charts.bar.update();
   } else {
     charts.bar=new Chart(document.getElementById('barChart'),{
       type:'bar',
       data:{labels:barLabels,datasets:[{data:barData,backgroundColor:barBg,borderColor:barBorder,borderWidth:1,borderRadius:8}]},
-      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b6b85'},grid:{display:false}},y:{ticks:{color:'#6b6b85'},grid:{color:'#2a2a3a'}}},maintainAspectRatio:true}
+      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:textColor},grid:{display:false}},y:{ticks:{color:textColor},grid:{color:gridColor}}},maintainAspectRatio:true}
     });
   }
 
@@ -1073,12 +1094,15 @@ function renderCharts(){
   if(charts.line) {
     charts.line.data.labels = lineLabels;
     charts.line.data.datasets[0].data = dailySums;
+    charts.line.options.scales.x.ticks.color = textColor;
+    charts.line.options.scales.y.ticks.color = textColor;
+    charts.line.options.scales.y.grid.color = gridColor;
     charts.line.update();
   } else {
     charts.line=new Chart(document.getElementById('lineChart'),{
       type:'bar',
       data:{labels:lineLabels,datasets:[{data:dailySums,backgroundColor:'rgba(124,106,247,0.4)',borderColor:'#7c6af7',borderWidth:2,borderRadius:6,hoverBackgroundColor:'rgba(124,106,247,0.8)'}]},
-      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b6b85'},grid:{display:false}},y:{ticks:{color:'#6b6b85'},grid:{color:'#2a2a3a'}}},maintainAspectRatio:true}
+      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:textColor},grid:{display:false}},y:{ticks:{color:textColor},grid:{color:gridColor}}},maintainAspectRatio:true}
     });
   }
 
@@ -1095,12 +1119,15 @@ function renderCharts(){
   if(charts.trend) {
     charts.trend.data.labels = trendLabels;
     charts.trend.data.datasets[0].data = trend;
+    charts.trend.options.scales.x.ticks.color = textColor;
+    charts.trend.options.scales.y.ticks.color = textColor;
+    charts.trend.options.scales.y.grid.color = gridColor;
     charts.trend.update();
   } else {
     charts.trend=new Chart(document.getElementById('trendChart'),{
       type:'line',
       data:{labels:trendLabels,datasets:[{data:trend,borderColor:'#f7c06a',backgroundColor:'rgba(247,192,106,0.1)',borderWidth:2,tension:0.4,pointBackgroundColor:'#f7c06a',pointRadius:4,fill:true}]},
-      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b6b85'},grid:{display:false}},y:{ticks:{color:'#6b6b85'},grid:{color:'#2a2a3a'}}},maintainAspectRatio:true}
+      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:textColor},grid:{display:false}},y:{ticks:{color:textColor},grid:{color:gridColor}}},maintainAspectRatio:true}
     });
   }
 }
