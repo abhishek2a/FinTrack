@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>FinTrack — Smart Expense Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -45,14 +48,14 @@
     --shadow: 0 4px 16px rgba(0,0,0,0.08);
   }
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; overflow-x:hidden; transition: background 0.3s, color 0.3s; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; overflow-x:hidden; transition: background 0.3s, color 0.3s; padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 
   /* Auth Forms */
   .auth-link { color:var(--accent); cursor:pointer; text-decoration:underline; font-size:0.85rem; }
   
   @media(max-width:600px) {
-    header { padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
-    .header-right { margin-left: auto; }
+    header { padding: calc(12px + env(safe-area-inset-top)) 16px 12px 16px; flex-wrap: nowrap; gap: 8px; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
     .header-user { font-size: 0.8rem; }
     
     /* Bottom Navigation Tab Bar */
@@ -64,6 +67,15 @@
     .cards-grid { grid-template-columns: 1fr; }
     .form-grid, .form-row { grid-template-columns: 1fr !important; }
     #toast { width: 90%; left: 50%; text-align: center; white-space: normal; bottom: calc(80px + env(safe-area-inset-bottom)); }
+    .splash-logo { font-size: 2.2rem !important; }
+    .card { padding: 14px; }
+    .card-value { font-size: 1.25rem; }
+    .logo { font-size: 1.1rem; }
+    .modal { padding: 20px; }
+    .setting-row.has-input { flex-wrap: wrap; gap: 12px; }
+    .setting-row.has-input .setting-info { width: 100%; flex: none; }
+    .setting-row.has-input > div:nth-child(2) { width: 100%; justify-content: flex-start; }
+    .setting-row.has-input input { flex: 1; min-width: 0; }
   }
 
   /* SPLASH */
@@ -92,7 +104,7 @@
   /* HEADER */
   header {
     background:var(--surface); border-bottom:1px solid var(--border);
-    padding:16px 24px; display:flex; align-items:center; justify-content:space-between;
+    padding:calc(16px + env(safe-area-inset-top)) 24px 16px 24px; display:flex; align-items:center; justify-content:space-between;
     position:sticky; top:0; z-index:100; backdrop-filter:blur(16px);
   }
   .logo { font-family:'Syne',sans-serif; font-size:1.4rem; font-weight:800; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
@@ -387,21 +399,21 @@
         <div class="setting-info"><div class="setting-label">Light Mode</div><div class="setting-desc">Toggle light/dark theme</div></div>
         <label class="toggle"><input type="checkbox" id="themeToggle" onchange="toggleTheme()"><span class="toggle-slider"></span></label>
       </div>
-      <div class="setting-row">
+      <div class="setting-row has-input">
         <div class="setting-info"><div class="setting-label">Edit Name</div><div class="setting-desc">Update your display name</div></div>
         <div style="display:flex;gap:8px;align-items:center">
           <input type="text" id="editNameInput" style="width:120px" placeholder="New Name">
           <button class="btn-primary btn-sm" onclick="updateUserName()">Update</button>
         </div>
       </div>
-      <div class="setting-row">
+      <div class="setting-row has-input">
         <div class="setting-info"><div class="setting-label">Change Password</div><div class="setting-desc">Update your password</div></div>
         <div style="display:flex;gap:8px;align-items:center">
           <input type="password" id="editPwdInput" style="width:120px" placeholder="New Pwd">
           <button class="btn-primary btn-sm" onclick="updateUserPwd()">Update</button>
         </div>
       </div>
-      <div class="setting-row">
+      <div class="setting-row has-input">
         <div class="setting-info"><div class="setting-label">Monthly Budget</div><div class="setting-desc">Set limit for monthly spending</div></div>
         <div style="display:flex;gap:8px;align-items:center">
           <input type="number" id="budgetInput" style="width:100px" placeholder="0" min="0">
@@ -417,8 +429,15 @@
         <label class="toggle"><input type="checkbox" id="autocat" checked><span class="toggle-slider"></span></label>
       </div>
       <div class="setting-row">
+        <div class="setting-info"><div class="setting-label">Sync Data</div><div class="setting-desc">Push local data to cloud & pull updates</div></div>
+        <button class="btn-primary btn-sm" onclick="forceSync()">Sync Now</button>
+      </div>
+      <div class="setting-row">
         <div class="setting-info"><div class="setting-label" style="color:var(--danger)">Clear All Data</div><div class="setting-desc">Delete all expenses permanently</div></div>
         <button class="btn-primary btn-sm" style="background:var(--danger)" onclick="clearAllData()">Clear</button>
+      </div>
+      <div style="text-align:center; padding:20px; color:var(--muted); font-size:0.8rem; letter-spacing:1px;">
+        FinTrack App Version 1.0.1
       </div>
     </div>
   </main>
@@ -530,6 +549,7 @@
       <div><label>Frequency</label><select id="rFreq">
         <option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
       </select></div>
+      <div><label>Start Date</label><input type="date" id="rDate"></div>
       <div style="grid-column:1/-1"><button class="btn-primary" style="width:100%;justify-content:center" id="saveRecBtn">Save</button></div>
     </div>
   </div>
@@ -601,6 +621,15 @@ onAuthStateChanged(auth, async (user) => {
 
 async function loadData() {
   if(!window.currentUser) return;
+  
+  const localExp = localStorage.getItem('ft_expenses_backup');
+  if(localExp) {
+    try {
+      window.expenses = JSON.parse(localExp).map(e=>({ ...e, date: new Date(e.date) }));
+      renderDashboard(); renderExpenseList(); renderCharts();
+    } catch(e){}
+  }
+
   try {
     const q = query(collection(db,`users/${window.currentUser.uid}/expenses`), orderBy('date','desc'));
     const snap = await getDocs(q);
@@ -613,29 +642,42 @@ async function loadData() {
     if(rDoc.exists()) window.recurring = rDoc.data().list || [];
 
     await processRecurring();
-  } catch(e) { console.error("Error loading data:", e); window.showToast("Error loading data"); }
+    localStorage.setItem('ft_expenses_backup', JSON.stringify(window.expenses));
+  } catch(e) { console.error("Error loading data:", e); window.showToast("Using local data. Cloud sync failed."); }
 }
 
 async function processRecurring() {
   const todayMs = today().getTime();
   let changed = false;
   for (let r of window.recurring) {
-    if (!r.lastRun) { r.lastRun = todayMs; changed = true; continue; }
-    
-    let daysDiff = Math.floor((todayMs - r.lastRun) / 86400000);
-    let shouldRun = false;
-    if (r.freq === 'daily' && daysDiff >= 1) shouldRun = true;
-    else if (r.freq === 'weekly' && daysDiff >= 7) shouldRun = true;
-    else if (r.freq === 'monthly' && daysDiff >= 30) shouldRun = true;
-
-    if (shouldRun) {
-      const data = { amount: r.amount, category: r.category, note: `${r.name} (Auto)`, date: Timestamp.fromDate(today()), recurring: r.freq };
-      const ref = await addDoc(collection(db,`users/${window.currentUser.uid}/expenses`), data);
-      window.expenses.unshift({id:ref.id, ...data, date: today()});
-      r.lastRun = todayMs;
+    if (!r.nextRun && r.lastRun) {
+      const d = new Date(r.lastRun);
+      if (r.freq === 'daily') d.setDate(d.getDate() + 1);
+      else if (r.freq === 'weekly') d.setDate(d.getDate() + 7);
+      else if (r.freq === 'monthly') d.setMonth(d.getMonth() + 1);
+      r.nextRun = d.getTime();
       changed = true;
-      window.showToast(`Auto-added: ${r.name}`);
+    } else if (!r.nextRun && !r.lastRun) {
+      r.nextRun = todayMs;
+      changed = true;
     }
+
+    let runs = 0;
+    while (r.nextRun <= todayMs && runs < 50) {
+      const d = new Date(r.nextRun);
+      const data = { amount: r.amount, category: r.category, note: `${r.name} (Auto)`, date: Timestamp.fromDate(d), recurring: r.freq };
+      const ref = await addDoc(collection(db,`users/${window.currentUser.uid}/expenses`), data);
+      window.expenses.unshift({id:ref.id, ...data, date: d});
+      
+      if (r.freq === 'daily') d.setDate(d.getDate() + 1);
+      else if (r.freq === 'weekly') d.setDate(d.getDate() + 7);
+      else if (r.freq === 'monthly') d.setMonth(d.getMonth() + 1);
+      r.nextRun = d.getTime();
+      
+      runs++;
+      changed = true;
+    }
+    if (runs > 0) window.showToast(`Auto-added: ${r.name} (${runs}x)`);
   }
   if(changed && window.currentUser) {
     await setDoc(doc(db,'users',window.currentUser.uid,'config','recurring'), {list: window.recurring});
@@ -1021,13 +1063,13 @@ function renderInsights(){
 // RECURRING
 function renderRecurring(){
   const list=document.getElementById('recurringList');
-  if(!window.recurring.length){ list.innerHTML=`<div class="empty" style="padding:24px"><div class="empty-icon">🔄</div><div class="empty-text">No recurring expenses</div></div>`; return; }
+  if(!window.recurring.length){ list.innerHTML=`<div class="empty" style="padding:24px"><div class="empty-icon">💸</div><div class="empty-text">No recurring expenses</div></div>`; return; }
   list.innerHTML=window.recurring.map((r,i)=>`
     <div class="recurring-item" style="margin-bottom:8px">
-      <div class="cat-dot" style="background:${CATS[r.category]||'#a0a0b8'}22;color:${CATS[r.category]||'#a0a0b8'}">${EMOJIS[r.category]||'📦'}</div>
-      <div style="flex:1"><div style="font-size:0.9rem;font-weight:500">${escapeHTML(r.name)}</div><div style="font-size:0.75rem;color:var(--muted)">${escapeHTML(r.category)} · ${escapeHTML(r.freq)}</div></div>
+      <div class="cat-dot" style="background:${CATS[r.category]||'#a0a0b8'}22;color:${CATS[r.category]||'#a0a0b8'}">${EMOJIS[r.category]||'🏷️'}</div>
+      <div style="flex:1"><div style="font-size:0.9rem;font-weight:500">${escapeHTML(r.name)}</div><div style="font-size:0.75rem;color:var(--muted)">${escapeHTML(r.category)} • ${escapeHTML(r.freq)} • Next: ${new Date(r.nextRun).toLocaleDateString('en-IN', {month:'short', day:'numeric'})}</div></div>
       <div style="font-family:Syne,sans-serif;font-weight:700;color:var(--accent2);margin-right:12px">${fmt(r.amount)}</div>
-      <button class="btn-xs del" onclick="deleteRecurring(${i})">🗑</button>
+      <button class="btn-xs del" onclick="deleteRecurring(${i})">🗑️</button>
     </div>
   `).join('');
 }
@@ -1037,8 +1079,11 @@ window.saveRecurring=async function(){
   const amount=document.getElementById('rAmount').value;
   const cat=document.getElementById('rCategory').value;
   const freq=document.getElementById('rFreq').value;
-  if(!name||!amount){ showToast('Fill all fields'); return; }
-  window.recurring.push({name,amount:+amount,category:cat,freq,lastRun:today().getTime()});
+  const dateStr=document.getElementById('rDate').value;
+  if(!name||!amount||!dateStr){ showToast('Fill all fields'); return; }
+  const [y,m,d] = dateStr.split('-');
+  const startDate = new Date(y, m-1, d).getTime();
+  window.recurring.push({name,amount:+amount,category:cat,freq,nextRun:startDate});
   if(window.currentUser) {
     try { await setDoc(doc(db,'users',window.currentUser.uid,'config','recurring'), {list: window.recurring}); } catch(e){}
   }
@@ -1069,26 +1114,41 @@ window.saveExpense=async function(){
   const btn=document.getElementById('saveBtn');
   btn.innerHTML='<span class="spinner"></span>';
   btn.disabled=true;
-  try {
-    const [y,m,d] = date.split('-');
-    const localDate = new Date(y, m-1, d);
-    const data={amount,category,note,date:Timestamp.fromDate(localDate),recurring};
-    if(window.editId){
-      await updateDoc(doc(db,`users/${window.currentUser.uid}/expenses`,window.editId),data);
-      const idx=window.expenses.findIndex(e=>e.id===window.editId);
-      if(idx>=0) window.expenses[idx]={...window.expenses[idx],...data,date:localDate};
-      window.showToast('Expense updated!');
-      window.editId=null;
-    } else {
-      const ref=await addDoc(collection(db,`users/${window.currentUser.uid}/expenses`),data);
-      window.expenses.unshift({id:ref.id,...data,date:localDate});
-      window.showToast('Expense added!');
-    }
-    closeModal('addModal');
-    renderDashboard(); renderExpenseList(); renderCharts();
-  } catch(e){ window.showToast('Error saving. Check Firebase.'); console.error(e); }
+
+  const [y,m,d] = date.split('-');
+  const localDate = new Date(y, m-1, d);
+  const isNew = !window.editId;
+  const tempId = isNew ? 'temp_' + Date.now() : window.editId;
+  
+  const localData = { id: tempId, amount, category, note, date: localDate, recurring };
+  if(isNew) {
+    window.expenses.unshift(localData);
+  } else {
+    const idx = window.expenses.findIndex(e=>e.id===window.editId);
+    if(idx>=0) window.expenses[idx] = localData;
+  }
+  
+  localStorage.setItem('ft_expenses_backup', JSON.stringify(window.expenses));
+  renderDashboard(); renderExpenseList(); renderCharts();
+  closeModal('addModal');
+  window.showToast(isNew ? 'Added locally! Syncing...' : 'Updated locally! Syncing...');
   btn.innerHTML='Save Expense';
   btn.disabled=false;
+  window.editId=null;
+
+  try {
+    const fbData={amount,category,note,date:Timestamp.fromDate(localDate),recurring};
+    if(!isNew){
+      await updateDoc(doc(db,`users/${window.currentUser.uid}/expenses`,tempId),fbData);
+      window.showToast('Sync successful!');
+    } else {
+      const ref=await addDoc(collection(db,`users/${window.currentUser.uid}/expenses`),fbData);
+      const idx=window.expenses.findIndex(e=>e.id===tempId);
+      if(idx>=0) window.expenses[idx].id = ref.id;
+      localStorage.setItem('ft_expenses_backup', JSON.stringify(window.expenses));
+      window.showToast('Sync successful!');
+    }
+  } catch(e) { console.error(e); window.showToast('Cloud sync delayed. Will retry later.'); }
 }
 
 window.editExpense=function(id){
@@ -1106,12 +1166,21 @@ window.editExpense=function(id){
 
 window.deleteExpense=async function(id){
   if(!confirm('Delete this expense?')) return;
+  const oldExpenses = [...window.expenses];
+  window.expenses=window.expenses.filter(e=>e.id!==id);
+  localStorage.setItem('ft_expenses_backup', JSON.stringify(window.expenses));
+  renderDashboard(); renderExpenseList(); renderCharts();
+  window.showToast('Deleted locally! Syncing...');
   try {
-    await deleteDoc(doc(db,`users/${window.currentUser.uid}/expenses`,id));
-    window.expenses=window.expenses.filter(e=>e.id!==id);
+    if(!id.startsWith('temp_')) {
+      await deleteDoc(doc(db,`users/${window.currentUser.uid}/expenses`,id));
+    }
+    window.showToast('Sync successful!');
+  } catch(e){ 
+    window.expenses = oldExpenses; // rollback
     renderDashboard(); renderExpenseList(); renderCharts();
-    window.showToast('Deleted');
-  } catch(e){ window.showToast('Error deleting'); }
+    window.showToast('Error deleting, reverted.'); 
+  }
 }
 
 // AI CATEGORIZE
@@ -1156,9 +1225,17 @@ window.clearAllData=async function(){
     const snap=await getDocs(collection(db,`users/${window.currentUser.uid}/expenses`));
     await Promise.all(snap.docs.map(d=>deleteDoc(d.ref)));
     window.expenses=[];
+    localStorage.removeItem('ft_expenses_backup');
     renderDashboard(); renderExpenseList(); renderCharts();
     window.showToast('All data cleared');
   } catch(e){ window.showToast('Error clearing data'); }
+}
+
+window.forceSync=async function(){
+  window.showToast('Syncing with Firebase...');
+  await loadData();
+  renderDashboard(); renderExpenseList(); renderCharts();
+  window.showToast('Sync completed!');
 }
 
 // MODAL
@@ -1171,6 +1248,12 @@ window.openModal=function(id){
     document.getElementById('fDate').value=new Date().toISOString().split('T')[0];
     document.getElementById('fRecurring').value='none';
     document.getElementById('aiTag').style.display='none';
+  } else if (id==='recurringModal') {
+    document.getElementById('rName').value='';
+    document.getElementById('rAmount').value='';
+    document.getElementById('rCategory').value='Food';
+    document.getElementById('rFreq').value='monthly';
+    document.getElementById('rDate').value=new Date().toISOString().split('T')[0];
   }
   document.getElementById(id).classList.add('open');
 }
