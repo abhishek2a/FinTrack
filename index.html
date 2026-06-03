@@ -1623,7 +1623,21 @@ document.getElementById('saveRecBtn')?.addEventListener('click', window.saveRecu
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistration().then(reg => {
         if (reg) {
-          reg.update().then(() => window.showToast('Checked for updates!'));
+          if (reg.waiting) {
+            newWorker = reg.waiting;
+            openModal('updateModal');
+            return;
+          }
+          window.showToast('Checking for updates...');
+          reg.update().then(() => {
+            setTimeout(() => {
+              if (!reg.installing && !reg.waiting) {
+                window.showToast('You are on the latest version!');
+              }
+            }, 1000);
+          }).catch(() => {
+            window.showToast('Failed to check for updates.');
+          });
         }
       });
     }
