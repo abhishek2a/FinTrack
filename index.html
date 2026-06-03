@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="FinTrack">
 <title>FinTrack ✨ Smart Expense Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 <style>
   :root {
     /* Dark Mode (Default) */
@@ -172,7 +172,6 @@
   .expense-item {
     background:var(--card-bg); border:1px solid var(--border); border-radius:12px;
     padding:14px 16px; display:flex; align-items:center; gap:12px;
-    transition:border-color 0.2s;
   }
   .expense-item:hover { border-color:var(--accent); }
   .cat-dot { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
@@ -812,7 +811,7 @@ window.handleAuth = async function() {
       window.showToast("Account created successfully!");
     } else {
       await signInWithEmailAndPassword(auth, email, pwd);
-      window.showToast("Signed in successfully!");
+      closeModal('authModal');
     }
   } catch(e) {
     window.showToast(e.message.replace("Firebase: ", ""));
