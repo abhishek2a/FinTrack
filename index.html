@@ -54,7 +54,16 @@
   .auth-link { color:var(--accent); cursor:pointer; text-decoration:underline; font-size:0.85rem; }
   
   @media(max-width:600px) {
-    header { padding: calc(12px + env(safe-area-inset-top)) 16px 12px 16px; flex-wrap: nowrap; gap: 8px; border-bottom: none !important; box-shadow: none !important; }
+    header { 
+      padding: calc(12px + env(safe-area-inset-top)) 16px 12px 16px; 
+      flex-wrap: nowrap; 
+      gap: 8px; 
+      border-bottom: none !important; 
+      box-shadow: none !important;
+      background: var(--bg) !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
     #btnAddExp { display: none !important; }
     .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
     .header-user { font-size: 0.8rem; }
@@ -164,7 +173,7 @@
   .expense-item:hover { border-color:var(--accent); }
   .cat-dot { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
   .expense-info { flex:1; min-width:0; }
-  .expense-note { font-size:0.9rem; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .expense-note { font-size:0.9rem; font-weight:500; word-break: break-word; }
   .expense-meta { font-size:0.75rem; color:var(--muted); margin-top:2px; }
   .expense-amount { font-family:'Syne',sans-serif; font-size:1rem; font-weight:700; color:var(--accent2); flex-shrink:0; }
   .expense-actions { display:flex; gap:6px; flex-shrink:0; }
@@ -493,7 +502,7 @@
     <div class="form-grid">
       <div>
         <label>Amount (₹)</label>
-        <input type="number" id="fAmount" placeholder="0.00" min="0" step="0.01">
+        <input type="number" id="fAmount" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
       </div>
       <div>
         <label>Category <span class="ai-badge" id="aiTag" style="display:none">AI</span></label>
@@ -540,7 +549,7 @@
     </div>
     <div class="form-grid">
       <div><label>Name</label><input type="text" id="rName" placeholder="e.g. Netflix, Gym"></div>
-      <div><label>Amount (₹)</label><input type="number" id="rAmount" placeholder="0.00"></div>
+      <div><label>Amount (₹)</label><input type="number" id="rAmount" placeholder="0.00" inputmode="decimal"></div>
       <div><label>Category</label><select id="rCategory">
         <option value="Food">🍔 Food</option><option value="Travel">✈️ Travel</option>
         <option value="Shopping">🛍️ Shopping</option><option value="Bills">💡 Bills</option>
@@ -991,12 +1000,17 @@ function renderCharts(){
     trendLabels.push(d.toLocaleDateString('en-IN',{month:'short','year':'2-digit'}));
     trend.push(sum);
   }
-  if(charts.trend) charts.trend.destroy();
-  charts.trend=new Chart(document.getElementById('trendChart'),{
-    type:'line',
-    data:{labels:trendLabels,datasets:[{data:trend,borderColor:'#f7c06a',backgroundColor:'rgba(247,192,106,0.1)',borderWidth:2,tension:0.4,pointBackgroundColor:'#f7c06a',pointRadius:4,fill:true}]},
-    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b6b85'},grid:{display:false}},y:{ticks:{color:'#6b6b85'},grid:{color:'#2a2a3a'}}},maintainAspectRatio:true}
-  });
+  if(charts.trend) {
+    charts.trend.data.labels = trendLabels;
+    charts.trend.data.datasets[0].data = trend;
+    charts.trend.update();
+  } else {
+    charts.trend=new Chart(document.getElementById('trendChart'),{
+      type:'line',
+      data:{labels:trendLabels,datasets:[{data:trend,borderColor:'#f7c06a',backgroundColor:'rgba(247,192,106,0.1)',borderWidth:2,tension:0.4,pointBackgroundColor:'#f7c06a',pointRadius:4,fill:true}]},
+      options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b6b85'},grid:{display:false}},y:{ticks:{color:'#6b6b85'},grid:{color:'#2a2a3a'}}},maintainAspectRatio:true}
+    });
+  }
 }
 
 // INSIGHTS (AI via Claude API)
@@ -1324,16 +1338,18 @@ function updateMonthLabel(){
 }
 
 // TOAST
+let toastTimeout;
 window.showToast=function(msg,dur=2500){
   const t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),dur);
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(()=>t.classList.remove('show'),dur);
 }
 
 // START
-document.getElementById('authBtn')?.addEventListener('click', handleAuth);
-document.getElementById('saveBtn')?.addEventListener('click', saveExpense);
-document.getElementById('saveRecBtn')?.addEventListener('click', saveRecurring);
+document.getElementById('authBtn')?.addEventListener('click', window.handleAuth);
+document.getElementById('saveBtn')?.addEventListener('click', window.saveExpense);
+document.getElementById('saveRecBtn')?.addEventListener('click', window.saveRecurring);
 // App initialized by onAuthStateChanged
 </script>
 </body>
