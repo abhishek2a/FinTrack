@@ -313,7 +313,6 @@
           <span style="font-size:0.6rem; color:var(--muted); margin-left:2px">▼</span>
         </div>
         <div class="dropdown-menu" id="dropdownMenu">
-          <div id="syncStatusDisplay" style="padding:8px 16px; font-size:0.75rem; color:var(--muted); border-bottom:1px solid var(--border); text-align:center; pointer-events:none;">🟢 Synced</div>
           <button onclick="signOutUser()">Sign Out</button>
         </div>
       </div>
@@ -406,6 +405,10 @@
 
     <!-- SETTINGS -->
     <div class="page" id="page-settings">
+      <div class="setting-row">
+        <div class="setting-info"><div class="setting-label">Sync Status</div><div class="setting-desc">Database connection</div></div>
+        <div id="syncStatusDisplay" style="font-size:0.85rem; color:var(--muted);">🟢 Synced</div>
+      </div>
       <div class="setting-row">
         <div class="setting-info"><div class="setting-label">Light Mode</div><div class="setting-desc">Toggle light/dark theme</div></div>
         <label class="toggle"><input type="checkbox" id="themeToggle" onchange="toggleTheme()"><span class="toggle-slider"></span></label>
@@ -672,7 +675,9 @@ async function loadData() {
   try {
     const q = query(collection(db,`users/${window.currentUser.uid}/expenses`), orderBy('date','desc'));
     
-    if(window.unsubscribeExpenses) window.unsubscribeExpenses();
+    if(window.unsubscribeExpenses) { window.unsubscribeExpenses(); window.unsubscribeExpenses=null; }
+    if(window.unsubscribeRecurring) { window.unsubscribeRecurring(); window.unsubscribeRecurring=null; }
+    
     await new Promise((resolve) => {
       let isFirst = true;
       window.unsubscribeExpenses = onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
@@ -707,8 +712,11 @@ async function loadData() {
     // Load config from Firestore
     const sDoc = await getDoc(doc(db,'users',window.currentUser.uid,'config','settings'));
     if(sDoc.exists()) { window.settings = sDoc.data(); applySettings(); }
-    const rDoc = await getDoc(doc(db,'users',window.currentUser.uid,'config','recurring'));
-    if(rDoc.exists()) window.recurring = rDoc.data().list || [];
+    
+    window.unsubscribeRecurring = onSnapshot(doc(db,'users',window.currentUser.uid,'config','recurring'), (docSnap) => {
+      window.recurring = docSnap.exists() ? (docSnap.data().list || []) : [];
+      requestAnimationFrame(() => { if(typeof renderRecurring === 'function') renderRecurring(); });
+    });
 
     await processRecurring();
   } catch(e) { console.error("Error loading data:", e); window.showToast("Using local cache."); }
@@ -807,7 +815,8 @@ window.handleAuth = async function() {
 
 window.signOutUser = async function() {
   try { 
-    window.unsubscribeExpenses?.(); 
+    if(window.unsubscribeExpenses) window.unsubscribeExpenses();
+    if(window.unsubscribeRecurring) window.unsubscribeRecurring();
     if(charts.pie) { charts.pie.destroy(); charts.pie = null; }
     if(charts.bar) { charts.bar.destroy(); charts.bar = null; }
     if(charts.line) { charts.line.destroy(); charts.line = null; }
@@ -899,6 +908,10 @@ window.addEventListener('offline', () => {
   if(statusEl) statusEl.textContent = '⚪ Offline';
 });
 
+window.getLocalIsoDate = function(d = new Date()) {
+  return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+}
+
 function init() {
   applySettings();
   renderDashboard();
@@ -907,8 +920,7 @@ function init() {
   renderInsights();
   renderRecurring();
   updateMonthLabel();
-  const today = new Date();
-  document.getElementById('fDate').value = today.toISOString().split('T')[0];
+  document.getElementById('fDate').value = window.getLocalIsoDate();
 }
 
 function applySettings() {
@@ -1193,7 +1205,6 @@ window.generateInsights = async function(){
     if (insights.length === 0) insights.push({type:'info', emoji:'💡', text:'Keep logging expenses for better insights.'});
 
     renderInsightItems(insights);
-    window.showToast('✨ Local Insights updated!');
   } catch(e) {
     renderInsightItems([{type:'warn',emoji:'⚠️',text:'Error generating insights.'}]);
   }
@@ -1243,20 +1254,29 @@ window.saveRecurring=async function(){
   const startDate = new Date(y, m-1, d).getTime();
   
   const recData = {name,amount,category:cat,freq,nextRun:startDate};
-  if(window.editRecId != null) window.recurring[window.editRecId] = recData;
-  else window.recurring.push(recData);
-  
-  closeModal('recurringModal');
-  renderRecurring();
   
   if(window.currentUser) {
-    setDoc(doc(db,'users',window.currentUser.uid,'config','recurring'), {list: window.recurring})
-      .then(() => window.showToast(window.editRecId != null ? 'Recurring expense updated!' : 'Recurring expense saved!'))
-      .catch(() => window.showToast('Saved offline. Will sync automatically.'));
+    try {
+      const recRef = doc(db,'users',window.currentUser.uid,'config','recurring');
+      await runTransaction(db, async (transaction) => {
+        const docSnap = await transaction.get(recRef);
+        let list = docSnap.exists() ? (docSnap.data().list || []) : [];
+        if(window.editRecId != null) list[window.editRecId] = recData;
+        else list.push(recData);
+        transaction.set(recRef, {list});
+      });
+      window.showToast(window.editRecId != null ? 'Recurring expense updated!' : 'Recurring expense saved!');
+      closeModal('recurringModal');
+      window.editRecId = null;
+    } catch(e) {
+      window.showToast('Error saving recurring expense');
+    }
   } else {
+    if(window.editRecId != null) window.recurring[window.editRecId] = recData;
+    else window.recurring.push(recData);
+    closeModal('recurringModal');
+    renderRecurring();
     window.showToast('Saved locally.');
-  }
-  
   btn.innerHTML='Save Recurring';
   btn.disabled=false;
 }
@@ -1269,19 +1289,31 @@ window.editRecurring=function(i){
   document.getElementById('rAmount').value=r.amount;
   document.getElementById('rCategory').value=r.category;
   document.getElementById('rFreq').value=r.freq;
-  document.getElementById('rDate').value=new Date(r.nextRun).toISOString().split('T')[0];
+  document.getElementById('rDate').value=window.getLocalIsoDate(new Date(r.nextRun));
   document.getElementById('recurringModal').querySelector('.modal-title').textContent='Edit Recurring Expense';
   openModal('recurringModal');
 }
 
-window.deleteRecurring=function(i){
+window.deleteRecurring=async function(i){
   if(!confirm('Delete this recurring expense?')) return;
-  window.recurring.splice(i,1);
   if(window.currentUser) {
-    setDoc(doc(db,'users',window.currentUser.uid,'config','recurring'), {list: window.recurring}).catch(()=>{});
+    try {
+      const recRef = doc(db,'users',window.currentUser.uid,'config','recurring');
+      await runTransaction(db, async (transaction) => {
+        const docSnap = await transaction.get(recRef);
+        let list = docSnap.exists() ? (docSnap.data().list || []) : [];
+        list.splice(i,1);
+        transaction.set(recRef, {list});
+      });
+      window.showToast('Deleted');
+    } catch(e) {
+      window.showToast('Error deleting');
+    }
+  } else {
+    window.recurring.splice(i,1);
+    renderRecurring();
+    window.showToast('Deleted');
   }
-  renderRecurring();
-  showToast('Deleted');
 }
 
 // ADD/EDIT/DELETE
@@ -1328,7 +1360,7 @@ window.editExpense=function(id){
   document.getElementById('fAmount').value=e.amount;
   document.getElementById('fCategory').value=e.category;
   document.getElementById('fNote').value=e.note||'';
-  document.getElementById('fDate').value=new Date(e.date).toISOString().split('T')[0];
+  document.getElementById('fDate').value=window.getLocalIsoDate(new Date(e.date));
   document.getElementById('fRecurring').value=e.recurring||'none';
   openModal('addModal');
 }
@@ -1424,7 +1456,7 @@ window.openModal=function(id){
     document.getElementById('fAmount').value='';
     document.getElementById('fCategory').value='Food';
     document.getElementById('fNote').value='';
-    document.getElementById('fDate').value=new Date().toISOString().split('T')[0];
+    document.getElementById('fDate').value=window.getLocalIsoDate();
     document.getElementById('fRecurring').value='none';
     document.getElementById('aiTag').style.display='none';
   } else if (id==='recurringModal' && window.editRecId == null) {
@@ -1432,7 +1464,7 @@ window.openModal=function(id){
     document.getElementById('rAmount').value='';
     document.getElementById('rCategory').value='Food';
     document.getElementById('rFreq').value='monthly';
-    document.getElementById('rDate').value=new Date().toISOString().split('T')[0];
+    document.getElementById('rDate').value=window.getLocalIsoDate();
     document.getElementById('recurringModal').querySelector('.modal-title').textContent='Add Recurring Expense';
   }
   document.getElementById(id).classList.add('open');
