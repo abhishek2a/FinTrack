@@ -429,7 +429,7 @@
         <div class="setting-info"><div class="setting-label">Monthly Budget</div><div class="setting-desc">Set limit for monthly spending</div></div>
         <div style="display:flex;gap:8px;align-items:center">
           <input type="number" id="budgetInput" style="width:100px" placeholder="0" min="0">
-          <button class="btn-primary btn-sm" onclick="saveBudget()">Save</button>
+          <button class="btn-primary btn-sm" id="saveBudgetBtn" onclick="saveBudget()">Save</button>
         </div>
       </div>
       <div class="setting-row">
@@ -770,12 +770,13 @@ async function processRecurring() {
 
 window.toggleAuthMode = function() {
   window.isSignUpMode = !window.isSignUpMode;
-  document.getElementById('authTitle').textContent = window.isSignUpMode ? "Create Account" : "Sign In";
-  document.getElementById('authBtn').textContent = window.isSignUpMode ? "Sign Up" : "Sign In";
-  document.getElementById('nameField').style.display = window.isSignUpMode ? "block" : "none";
-  document.getElementById('authToggleText').textContent = window.isSignUpMode ? "Already have an account?" : "Don't have an account?";
-  document.getElementById('authToggleLink').textContent = window.isSignUpMode ? "Sign In" : "Sign Up";
-  document.getElementById('forgotPwdLink').style.display = window.isSignUpMode ? "none" : "inline";
+  const isSignUp = window.isSignUpMode;
+  document.getElementById('authTitle').textContent = isSignUp ? "Create Account" : "Sign In";
+  document.getElementById('authBtn').textContent = isSignUp ? "Sign Up" : "Sign In";
+  document.getElementById('nameField').style.display = isSignUp ? "block" : "none";
+  document.getElementById('authToggleText').textContent = isSignUp ? "Already have an account?" : "Don't have an account?";
+  document.getElementById('authToggleLink').textContent = isSignUp ? "Sign In" : "Sign Up";
+  document.getElementById('forgotPwdLink').style.display = isSignUp ? "none" : "inline";
 }
 
 window.handleAuth = async function() {
@@ -1366,7 +1367,7 @@ window.aiSuggestCategory=function(){
 
 // SETTINGS
 window.saveBudget=async function(){
-  const btn = document.querySelector('button[onclick="saveBudget()"]');
+  const btn = document.getElementById('saveBudgetBtn');
   if(btn) { btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true; }
   
   const val=+document.getElementById('budgetInput').value;
@@ -1374,9 +1375,12 @@ window.saveBudget=async function(){
   window.settings.warn=document.getElementById('warnToggle').checked;
   window.settings.autocat=document.getElementById('autocat').checked;
   if(window.currentUser) {
-    setDoc(doc(db,'users',window.currentUser.uid,'config','settings'), window.settings)
-      .then(() => window.showToast('Settings saved!'))
-      .catch(() => window.showToast('Settings saved locally.'));
+    try {
+      await setDoc(doc(db,'users',window.currentUser.uid,'config','settings'), window.settings);
+      window.showToast('Settings saved!');
+    } catch(e) {
+      window.showToast('Settings saved locally.');
+    }
   }
   localStorage.setItem('ft_settings',JSON.stringify(window.settings));
   renderDashboard();
