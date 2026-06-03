@@ -73,7 +73,7 @@
     .header-user { font-size: 0.8rem; }
     
     /* Bottom Navigation Tab Bar */
-    nav { position: fixed; bottom: 0; left: 0; right: 0; padding-bottom: env(safe-area-inset-bottom); z-index: 1000; background: var(--surface); border-top: 1px solid var(--border); border-bottom: none; overflow-x: visible; }
+    nav { position: fixed; bottom: 0; left: 0; right: 0; padding-bottom: env(safe-area-inset-bottom); z-index: 1000; background: var(--surface); border-top: 1px solid var(--border); border-bottom: none; overflow-x: visible; touch-action: none; -webkit-user-select: none; user-select: none; }
     nav button { padding: 12px 4px; font-size: 0.7rem; min-width: 0; flex: 1; border-bottom: none !important; border-top: 2px solid transparent; }
     nav button.active { border-top-color: var(--accent); }
     main { padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important; }
