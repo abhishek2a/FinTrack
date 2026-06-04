@@ -1,6 +1,7 @@
-const CACHE_NAME = 'fintrack-v1.1.3';
+const CACHE_NAME = 'fintrack-v1.1.5';
 const urlsToCache = [
   './index.html',
+  './logo.png',
   './'
 ];
 
