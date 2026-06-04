@@ -457,7 +457,7 @@
         <button class="btn-primary btn-sm" style="background:var(--danger)" onclick="clearAllData()">Clear</button>
       </div>
       <div style="text-align:center; padding:20px; color:var(--muted); font-size:0.8rem; letter-spacing:1px;">
-        FinTrack App Version 1.1.5
+        FinTrack App Version 1.1.6
       </div>
     </div>
   </main>
@@ -1577,7 +1577,7 @@ document.getElementById('saveRecBtn')?.addEventListener('click', window.saveRecu
   let newWorker;
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=1.1.5').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=1.1.6').then(reg => {
         console.log('SW registered!', reg);
         
         if (reg.waiting) {
